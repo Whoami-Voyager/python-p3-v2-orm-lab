@@ -20,6 +20,36 @@ class Review:
             + f"Employee: {self.employee_id}>"
         )
 
+    def get_year(self):
+        return self._year
+    def set_year(self, value):
+        if isinstance(value, int) and value >= 2000:
+            self._year = value
+        else:
+            raise ValueError("Not before the year 2000")
+    year = property(get_year, set_year)
+
+    def get_summary(self):
+        return self._summary
+    def set_summary(self, value):
+        if len(value) > 0:
+            self._summary = value
+        else:
+            raise ValueError("Empty strings are not accepted!")
+    summary = property(get_summary, set_summary)
+
+    def get_employee(self):
+        return self._employee_id
+
+    def set_employee(self, value):
+        # from employee import Employee
+        if type(value) is int and Employee.find_by_id(value):
+            self._employee_id = value
+        else:
+            raise ValueError("Not one of my elite employees")
+    employee_id = property(get_employee, set_employee)
+
+
     @classmethod
     def create_table(cls):
         """ Create a new table to persist the attributes of Review instances """
@@ -47,36 +77,84 @@ class Review:
         """ Insert a new row with the year, summary, and employee id values of the current Review object.
         Update object id attribute using the primary key value of new row.
         Save the object in local dictionary using table row's PK as dictionary key"""
-        pass
+        sql = """
+            INSERT INTO reviews (year, summary, employee_id)
+            VALUES (?, ?, ?)
+        """
+        CURSOR.execute(sql, (self.year, self.summary, self.employee_id))
+        CONN.commit()
+
+        self.id = CURSOR.lastrowid
 
     @classmethod
     def create(cls, year, summary, employee_id):
         """ Initialize a new Review instance and save the object to the database. Return the new instance. """
-        pass
+        review_instance = cls(year, summary, employee_id)
+        review_instance.save()
+
+        return review_instance
    
     @classmethod
     def instance_from_db(cls, row):
         """Return an Review instance having the attribute values from the table row."""
         # Check the dictionary for  existing instance using the row's primary key
-        pass
+        review = cls.all.get(row[0])
+        if review:
+            review.year = row[1]
+            review.summary = row[2]
+            review.employee_id = row[3]
+        else:
+            review = cls(row[1], row[2], row[3])
+            review.id = row[0]
+            cls.all[review.id] = review
+        return review
    
 
     @classmethod
     def find_by_id(cls, id):
         """Return a Review instance having the attribute values from the table row."""
-        pass
+        sql = """ 
+            SELECT *
+            FROM reviews
+            WHERE id = ?
+        """
+
+        row = CURSOR.execute(sql, (id,)).fetchone()
+        return cls.instance_from_db(row) if row else None
 
     def update(self):
         """Update the table row corresponding to the current Review instance."""
-        pass
+        sql = """
+            UPDATE reviews
+            SET year = ?, summary = ?
+            WHERE id = ? 
+        """
+        CURSOR.execute(sql, (self.year, self.summary, self.employee_id))
+        CONN.commit()
 
     def delete(self):
         """Delete the table row corresponding to the current Review instance,
         delete the dictionary entry, and reassign id attribute"""
-        pass
+        sql = """
+            DELETE FROM reviews
+            WHERE id = ?
+        """
+        CURSOR.execute(sql, (self.id,))
+        CONN.commit()
+
+        del type(self).all[self.id]
+
+        self.id = None
 
     @classmethod
     def get_all(cls):
         """Return a list containing one Review instance per table row"""
-        pass
+        sql = """
+            SELECT *
+            FROM reviews
+        """
+
+        rows = CURSOR.execute(sql).fetchall()
+
+        return [cls.instance_from_db(row) for row in rows]
 
